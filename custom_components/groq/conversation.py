@@ -104,14 +104,7 @@ class GroqConversationEntity(
         intent_response = intent.IntentResponse(language=user_input.language)
         llm_api: llm.APIInstance | None = None
         tools: list[dict] | None = None
-        llm_context = llm.LLMContext(
-            platform=DOMAIN,
-            context=user_input.context,
-            user_prompt=user_input.text,
-            language=user_input.language,
-            assistant=conversation.DOMAIN,
-            device_id=user_input.device_id,
-        )
+        llm_context = user_input.as_llm_context(DOMAIN)
 
         if options.get(CONF_LLM_HASS_API):
             try:
