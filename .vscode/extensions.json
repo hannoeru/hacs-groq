@@ -1,0 +1,24 @@
+{
+  "recommendations": [
+    // Python development
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "charliermarsh.ruff",
+    "ms-python.mypy-type-checker",
+
+    // Home Assistant
+    "keesschollaart.vscode-home-assistant",
+
+    // YAML/JSON
+    "redhat.vscode-yaml",
+    "esbenp.prettier-vscode",
+
+    // Git
+    "eamodio.gitlens",
+
+    // Utilities
+    "streetsidesoftware.code-spell-checker",
+    "usernamehw.errorlens",
+    "wayou.vscode-todo-highlight"
+  ]
+}

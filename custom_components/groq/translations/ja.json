@@ -1,0 +1,62 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Groq AI をセットアップ",
+        "description": "接続するには Groq API キーを入力してください。API キーは {api_key_url} から取得できます",
+        "data": {
+          "api_key": "API キー"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Groq AI を再認証",
+        "description": "{name} の API キーを更新する必要があります。"
+      }
+    },
+    "error": {
+      "invalid_auth": "API キーが無効です。API キーを確認して再試行してください。",
+      "cannot_connect": "Groq API に接続できません。インターネット接続を確認して再試行してください。",
+      "unknown": "予期しないエラーが発生しました。もう一度お試しください。"
+    },
+    "abort": {
+      "already_configured": "この API キーは既に設定されています。"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Groq AI を設定",
+        "description": "Groq AI 会話エージェントの設定をカスタマイズします。",
+        "data": {
+          "prompt": "システムプロンプト",
+          "llm_hass_api": "Home Assistant API（デバイス制御のためのツール呼び出しを有効化）",
+          "recommended": "推奨設定を使用",
+          "chat_model": "チャットモデル",
+          "temperature": "温度（0 = 集中的、2 = 創造的）",
+          "top_p": "Top P（ニュークリアスサンプリング）",
+          "max_tokens": "最大トークン数（最大応答長）",
+          "stt_model": "音声認識モデル",
+          "tts_model": "音声合成モデル",
+          "tts_voice": "音声合成ボイス"
+        }
+      }
+    }
+  },
+  "entity": {
+    "conversation": {
+      "groq": {
+        "name": "Groq 会話"
+      }
+    },
+    "stt": {
+      "groq": {
+        "name": "Groq 音声認識"
+      }
+    },
+    "tts": {
+      "groq": {
+        "name": "Groq 音声合成"
+      }
+    }
+  }
+}

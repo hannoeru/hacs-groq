@@ -1,0 +1,62 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "设置 Groq AI",
+        "description": "输入您的 Groq API 密钥以连接。您可以从 {api_key_url} 获取 API 密钥",
+        "data": {
+          "api_key": "API 密钥"
+        }
+      },
+      "reauth_confirm": {
+        "title": "重新验证 Groq AI",
+        "description": "{name} 的 API 密钥需要更新。"
+      }
+    },
+    "error": {
+      "invalid_auth": "API 密钥无效。请检查您的 API 密钥并重试。",
+      "cannot_connect": "无法连接到 Groq API。请检查您的网络连接并重试。",
+      "unknown": "发生意外错误。请重试。"
+    },
+    "abort": {
+      "already_configured": "此 API 密钥已配置。"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "配置 Groq AI",
+        "description": "自定义您的 Groq AI 对话代理设置。",
+        "data": {
+          "prompt": "系统提示",
+          "llm_hass_api": "Home Assistant API（启用工具调用以控制设备）",
+          "recommended": "使用推荐设置",
+          "chat_model": "聊天模型",
+          "temperature": "温度（0 = 聚焦，2 = 创造性）",
+          "top_p": "Top P（核采样）",
+          "max_tokens": "最大令牌数（最大响应长度）",
+          "stt_model": "语音转文字模型",
+          "tts_model": "文字转语音模型",
+          "tts_voice": "文字转语音声音"
+        }
+      }
+    }
+  },
+  "entity": {
+    "conversation": {
+      "groq": {
+        "name": "Groq 对话"
+      }
+    },
+    "stt": {
+      "groq": {
+        "name": "Groq 语音转文字"
+      }
+    },
+    "tts": {
+      "groq": {
+        "name": "Groq 文字转语音"
+      }
+    }
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up Groq AI",
+        "description": "Enter your Groq API key to connect. You can get an API key from {api_key_url}",
+        "data": {
+          "api_key": "API Key"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate Groq AI",
+        "description": "The API key for {name} needs to be updated."
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid API key. Please check your API key and try again.",
+      "cannot_connect": "Cannot connect to Groq API. Please check your internet connection and try again.",
+      "unknown": "An unexpected error occurred. Please try again."
+    },
+    "abort": {
+      "already_configured": "This API key is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Configure Groq AI",
+        "description": "Customize your Groq AI conversation agent settings.",
+        "data": {
+          "prompt": "System Prompt",
+          "llm_hass_api": "Home Assistant APIs (enable tool calling for device control)",
+          "recommended": "Use recommended settings",
+          "chat_model": "Chat Model",
+          "temperature": "Temperature (0 = focused, 2 = creative)",
+          "top_p": "Top P (nucleus sampling)",
+          "max_tokens": "Max Tokens (maximum response length)",
+          "stt_model": "Speech-to-Text Model",
+          "tts_model": "Text-to-Speech Model",
+          "tts_voice": "Text-to-Speech Voice"
+        }
+      }
+    }
+  },
+  "entity": {
+    "conversation": {
+      "groq": {
+        "name": "Groq Conversation"
+      }
+    },
+    "stt": {
+      "groq": {
+        "name": "Groq Speech to Text"
+      }
+    },
+    "tts": {
+      "groq": {
+        "name": "Groq Text to Speech"
+      }
+    }
+  }
+}
