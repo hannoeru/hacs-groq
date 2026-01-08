@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from collections.abc import AsyncGenerator
+import json
+from typing import Literal
 
 from homeassistant.components import conversation
 from homeassistant.components.conversation import ConversationEntity
@@ -10,12 +12,11 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_LLM_HASS_API, MATCH_ALL
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers import intent, llm
+from homeassistant.helpers import llm
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.util import ulid
 
 from groq import AsyncGroq
-from groq.types.chat import ChatCompletion
+from groq.types.chat import ChatCompletionChunk
 
 from .const import (
     CONF_CHAT_MODEL,
@@ -31,6 +32,9 @@ from .const import (
     RECOMMENDED_TOP_P,
 )
 
+# Max number of back and forth with the LLM to generate a response
+MAX_TOOL_ITERATIONS = 10
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -41,6 +45,107 @@ async def async_setup_entry(
     async_add_entities([GroqConversationEntity(config_entry)])
 
 
+def _convert_messages(
+    chat_log: conversation.ChatLog,
+) -> list[dict]:
+    """Convert chat log to Groq message format."""
+    messages = []
+
+    for content in chat_log.content:
+        if content.role == "system":
+            messages.append({"role": "system", "content": content.content})
+        elif content.role == "user":
+            messages.append({"role": "user", "content": content.content})
+        elif content.role == "assistant":
+            msg = {"role": "assistant"}
+            if content.content:
+                msg["content"] = content.content
+            if content.tool_calls:
+                msg["tool_calls"] = [  # type: ignore[assignment]
+                    {
+                        "id": tool_call.id,
+                        "type": "function",
+                        "function": {
+                            "name": tool_call.tool_name,
+                            "arguments": json.dumps(tool_call.tool_args),
+                        },
+                    }
+                    for tool_call in content.tool_calls
+                ]
+            messages.append(msg)
+        elif content.role == "tool_result":
+            messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": content.tool_call_id,
+                    "content": json.dumps(content.tool_result),
+                }
+            )
+
+    return messages
+
+
+async def _transform_stream(  # noqa: PLR0912
+    stream: AsyncGenerator[ChatCompletionChunk],
+) -> AsyncGenerator[
+    conversation.AssistantContentDeltaDict | conversation.ToolResultContentDeltaDict
+]:
+    """Transform Groq stream to Home Assistant format."""
+    current_tool_calls: dict[int, dict] = {}
+
+    async for chunk in stream:
+        if not chunk.choices:
+            continue
+
+        delta = chunk.choices[0].delta
+
+        # Handle content delta
+        if delta.content:
+            yield {"content": delta.content}
+
+        # Handle tool calls
+        if delta.tool_calls:
+            for tool_call_delta in delta.tool_calls:
+                idx = tool_call_delta.index
+                if idx not in current_tool_calls:
+                    current_tool_calls[idx] = {
+                        "id": tool_call_delta.id or "",
+                        "name": "",
+                        "arguments": "",
+                    }
+
+                if tool_call_delta.id:
+                    current_tool_calls[idx]["id"] = tool_call_delta.id
+                if tool_call_delta.function:
+                    if tool_call_delta.function.name:
+                        current_tool_calls[idx]["name"] = tool_call_delta.function.name
+                    if tool_call_delta.function.arguments:
+                        current_tool_calls[idx][
+                            "arguments"
+                        ] += tool_call_delta.function.arguments
+
+        # Check if we have complete tool calls
+        finish_reason = chunk.choices[0].finish_reason
+        if finish_reason == "tool_calls" and current_tool_calls:
+            tool_inputs = []
+            for tool_call in current_tool_calls.values():
+                if tool_call["id"] and tool_call["name"] and tool_call["arguments"]:
+                    try:
+                        tool_inputs.append(
+                            llm.ToolInput(
+                                id=tool_call["id"],
+                                tool_name=tool_call["name"],
+                                tool_args=json.loads(tool_call["arguments"]),
+                            )
+                        )
+                    except json.JSONDecodeError:
+                        LOGGER.warning(
+                            "Failed to parse tool arguments: %s", tool_call["arguments"]
+                        )
+            if tool_inputs:
+                yield {"tool_calls": tool_inputs}
+
+
 class GroqConversationEntity(
     ConversationEntity, conversation.AbstractConversationAgent
 ):
@@ -48,18 +153,19 @@ class GroqConversationEntity(
 
     _attr_has_entity_name = True
     _attr_name = None
+    _attr_supports_streaming = True
 
     def __init__(self, entry: ConfigEntry) -> None:
         """Initialize the agent."""
         self.entry = entry
-        self.history: dict[str, list[dict[str, Any]]] = {}
-        self._attr_unique_id = entry.entry_id
+        self._attr_unique_id = f"{entry.entry_id}_conversation"
         self._attr_device_info = {
-            "identifiers": {(DOMAIN, entry.entry_id)},
-            "name": entry.title,
+            "identifiers": {(DOMAIN, f"{entry.entry_id}_conversation")},
+            "name": "Conversation",
             "manufacturer": "Groq",
-            "model": "Conversation Agent",
+            "model": "Chat Completion",
             "entry_type": "service",
+            "via_device": (DOMAIN, entry.entry_id),
         }
         if self.entry.options.get(CONF_LLM_HASS_API):
             self._attr_supported_features = (
@@ -74,9 +180,6 @@ class GroqConversationEntity(
     async def async_added_to_hass(self) -> None:
         """When entity is added to Home Assistant."""
         await super().async_added_to_hass()
-        self.entry.async_on_unload(
-            self.entry.add_update_listener(self._async_entry_update_listener)
-        )
         conversation.async_set_agent(self.hass, self.entry, self)
 
     async def async_will_remove_from_hass(self) -> None:
@@ -84,45 +187,49 @@ class GroqConversationEntity(
         conversation.async_unset_agent(self.hass, self.entry)
         await super().async_will_remove_from_hass()
 
-    async def _async_entry_update_listener(
-        self, hass: HomeAssistant, entry: ConfigEntry
-    ) -> None:
-        """Handle options update."""
-        # Reload to pick up new options
-        await hass.config_entries.async_reload(entry.entry_id)
-
     @property
     def client(self) -> AsyncGroq:
         """Return the Groq client."""
         return self.entry.runtime_data
 
-    async def async_process(
-        self, user_input: conversation.ConversationInput
+    async def _async_handle_message(
+        self,
+        user_input: conversation.ConversationInput,
+        chat_log: conversation.ChatLog,
     ) -> conversation.ConversationResult:
-        """Process a sentence."""
+        """Process the user input and call the API."""
         options = self.entry.options
-        intent_response = intent.IntentResponse(language=user_input.language)
-        llm_api: llm.APIInstance | None = None
-        tools: list[dict] | None = None
-        llm_context = user_input.as_llm_context(DOMAIN)
 
-        if options.get(CONF_LLM_HASS_API):
-            try:
-                llm_api = await llm.async_get_api(
-                    self.hass,
-                    options[CONF_LLM_HASS_API],
-                    llm_context,
-                )
-            except HomeAssistantError as err:
-                LOGGER.error("Error getting LLM API: %s", err)
-                intent_response.async_set_error(
-                    intent.IntentResponseErrorCode.UNKNOWN,
-                    f"Error preparing LLM API: {err}",
-                )
-                return conversation.ConversationResult(
-                    response=intent_response, conversation_id=user_input.conversation_id
-                )
+        try:
+            await chat_log.async_provide_llm_data(
+                user_input.as_llm_context(DOMAIN),
+                options.get(CONF_LLM_HASS_API),
+                options.get(CONF_PROMPT),
+                user_input.extra_system_prompt,
+            )
+        except conversation.ConverseError as err:
+            return err.as_conversation_result()
 
+        await self._async_handle_chat_log(chat_log)
+
+        return conversation.async_get_result_from_chat_log(user_input, chat_log)
+
+    async def _async_handle_chat_log(
+        self,
+        chat_log: conversation.ChatLog,
+    ) -> None:
+        """Generate an answer for the chat log."""
+        options = self.entry.options
+
+        messages = _convert_messages(chat_log)
+
+        model = options.get(CONF_CHAT_MODEL, RECOMMENDED_CHAT_MODEL)
+        temperature = options.get(CONF_TEMPERATURE, RECOMMENDED_TEMPERATURE)
+        top_p = options.get(CONF_TOP_P, RECOMMENDED_TOP_P)
+        max_tokens = options.get(CONF_MAX_TOKENS, RECOMMENDED_MAX_TOKENS)
+
+        tools = None
+        if chat_log.llm_api:
             tools = [
                 {
                     "type": "function",
@@ -132,128 +239,58 @@ class GroqConversationEntity(
                         "parameters": tool.parameters,
                     },
                 }
-                for tool in llm_api.tools
+                for tool in chat_log.llm_api.tools
             ]
 
-        if user_input.conversation_id is None:
-            conversation_id = ulid.ulid_now()
-            messages = []
-        else:
-            conversation_id = user_input.conversation_id
-            messages = self.history.get(conversation_id, []).copy()
-
-        if not messages:
-            if system_prompt := options.get(CONF_PROMPT):
-                try:
-                    prompt = self._async_generate_prompt(system_prompt, llm_context)
-                except HomeAssistantError as err:
-                    LOGGER.error("Error rendering prompt: %s", err)
-                    intent_response.async_set_error(
-                        intent.IntentResponseErrorCode.UNKNOWN,
-                        f"Error rendering prompt: {err}",
-                    )
-                    return conversation.ConversationResult(
-                        response=intent_response,
-                        conversation_id=conversation_id,
-                    )
-                messages.append({"role": "system", "content": prompt})
-
-        messages.append({"role": "user", "content": user_input.text})
-
-        LOGGER.debug("Prompt for %s: %s", self.entry.title, messages)
-
-        # Get model parameters
-        model = options.get(CONF_CHAT_MODEL, RECOMMENDED_CHAT_MODEL)
-        temperature = options.get(CONF_TEMPERATURE, RECOMMENDED_TEMPERATURE)
-        top_p = options.get(CONF_TOP_P, RECOMMENDED_TOP_P)
-        max_tokens = options.get(CONF_MAX_TOKENS, RECOMMENDED_MAX_TOKENS)
-
-        try:
-            response: ChatCompletion = await self.client.chat.completions.create(
-                model=model,
-                messages=messages,  # type: ignore[arg-type]
-                temperature=temperature,
-                top_p=top_p,
-                max_tokens=max_tokens,
-                tools=tools if tools else None,
-            )
-        except Exception as err:
-            LOGGER.error("Error talking to Groq API: %s", err)
-            intent_response.async_set_error(
-                intent.IntentResponseErrorCode.UNKNOWN,
-                f"Error talking to Groq API: {err}",
-            )
-            return conversation.ConversationResult(
-                response=intent_response, conversation_id=conversation_id
-            )
-
-        LOGGER.debug("Response from Groq: %s", response)
-
-        choice = response.choices[0]
-        message = choice.message
-
-        # Handle tool calls
-        if message.tool_calls and llm_api:
-            tool_messages = []
-            for tool_call in message.tool_calls:
-                tool_name = tool_call.function.name
-                tool_args = tool_call.function.arguments
-
-                LOGGER.debug(
-                    "Tool call: %s with args: %s",
-                    tool_name,
-                    tool_args,
-                )
-
-                try:
-                    tool_result = await llm_api.async_call_tool(tool_call.model_dump())
-                except HomeAssistantError as err:
-                    tool_result = {"error": str(err)}
-
-                tool_messages.append(
-                    {
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "content": str(tool_result),
-                    }
-                )
-
-            # Add assistant message and tool responses to history
-            messages.append(message.model_dump(exclude_unset=True))
-            messages.extend(tool_messages)
-
-            # Make another API call with tool results
+        # To prevent infinite loops, we limit the number of iterations
+        for _ in range(MAX_TOOL_ITERATIONS):
             try:
-                response = await self.client.chat.completions.create(
+                # Use streaming for better UX
+                stream = await self.client.chat.completions.create(
                     model=model,
                     messages=messages,  # type: ignore[arg-type]
                     temperature=temperature,
                     top_p=top_p,
                     max_tokens=max_tokens,
+                    tools=tools if tools else None,  # type: ignore[arg-type]
+                    stream=True,
                 )
-                choice = response.choices[0]
-                message = choice.message
             except Exception as err:
-                LOGGER.error("Error in second Groq API call: %s", err)
-                intent_response.async_set_error(
-                    intent.IntentResponseErrorCode.UNKNOWN,
-                    f"Error in second Groq API call: {err}",
-                )
-                return conversation.ConversationResult(
-                    response=intent_response, conversation_id=conversation_id
-                )
+                LOGGER.error("Error talking to Groq API: %s", err)
+                raise HomeAssistantError("Error talking to Groq API") from err
 
-        # Store the conversation history
-        messages.append({"role": "assistant", "content": message.content})
-        self.history[conversation_id] = messages
+            # Process the stream through ChatLog
+            async for content in chat_log.async_add_delta_content_stream(
+                self.entity_id,
+                _transform_stream(stream),  # type: ignore[arg-type]
+            ):
+                # Add streamed content to messages for next iteration
+                if content.role == "assistant":
+                    msg = {"role": "assistant"}
+                    if content.content:
+                        msg["content"] = content.content
+                    if content.tool_calls:
+                        msg["tool_calls"] = [  # type: ignore[assignment]
+                            {
+                                "id": tool_call.id,
+                                "type": "function",
+                                "function": {
+                                    "name": tool_call.tool_name,
+                                    "arguments": json.dumps(tool_call.tool_args),
+                                },
+                            }
+                            for tool_call in content.tool_calls
+                        ]
+                    messages.append(msg)
+                elif content.role == "tool_result":
+                    messages.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": content.tool_call_id,
+                            "content": json.dumps(content.tool_result),
+                        }
+                    )
 
-        intent_response.async_set_speech(message.content or "")
-        return conversation.ConversationResult(
-            response=intent_response, conversation_id=conversation_id
-        )
-
-    def _async_generate_prompt(
-        self, prompt_template: str, llm_context: llm.LLMContext
-    ) -> str:
-        """Generate a prompt from a template."""
-        return llm.async_render_prompt(self.hass, prompt_template, llm_context)
+            # If no unresponded tool results, we're done
+            if not chat_log.unresponded_tool_results:
+                break

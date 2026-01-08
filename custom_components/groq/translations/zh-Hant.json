@@ -28,6 +28,9 @@
         "title": "設定 Groq AI",
         "description": "自訂您的 Groq AI 對話代理設定。",
         "data": {
+          "enable_conversation": "啟用對話代理",
+          "enable_stt": "啟用語音轉文字",
+          "enable_tts": "啟用文字轉語音",
           "prompt": "系統提示",
           "llm_hass_api": "Home Assistant API（啟用工具呼叫以控制裝置）",
           "recommended": "使用建議設定",

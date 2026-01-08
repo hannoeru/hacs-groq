@@ -28,6 +28,9 @@
         "title": "Configure Groq AI",
         "description": "Customize your Groq AI conversation agent settings.",
         "data": {
+          "enable_conversation": "Enable Conversation Agent",
+          "enable_stt": "Enable Speech-to-Text",
+          "enable_tts": "Enable Text-to-Speech",
           "prompt": "System Prompt",
           "llm_hass_api": "Home Assistant APIs (enable tool calling for device control)",
           "recommended": "Use recommended settings",

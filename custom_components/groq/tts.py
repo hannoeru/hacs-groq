@@ -51,11 +51,12 @@ class GroqTTSEntity(TextToSpeechEntity):
         self.entry = config_entry
         self._attr_unique_id = f"{config_entry.entry_id}_tts"
         self._attr_device_info = {
-            "identifiers": {(DOMAIN, config_entry.entry_id)},
-            "name": config_entry.title,
+            "identifiers": {(DOMAIN, f"{config_entry.entry_id}_tts")},
+            "name": "Text to Speech",
             "manufacturer": "Groq",
-            "model": "Text to Speech",
+            "model": "Orpheus",
             "entry_type": "service",
+            "via_device": (DOMAIN, config_entry.entry_id),
         }
         self._update_voice_list()
 

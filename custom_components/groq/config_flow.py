@@ -30,6 +30,9 @@ from groq import APIError, AsyncGroq, AuthenticationError
 from .const import (
     CHAT_MODELS,
     CONF_CHAT_MODEL,
+    CONF_ENABLE_CONVERSATION,
+    CONF_ENABLE_STT,
+    CONF_ENABLE_TTS,
     CONF_MAX_TOKENS,
     CONF_PROMPT,
     CONF_RECOMMENDED,
@@ -209,6 +212,18 @@ async def groq_config_option_schema(
 
     schema: dict[vol.Required | vol.Optional, Any] = {
         vol.Optional(
+            CONF_ENABLE_CONVERSATION,
+            default=options.get(CONF_ENABLE_CONVERSATION, True),
+        ): bool,
+        vol.Optional(
+            CONF_ENABLE_STT,
+            default=options.get(CONF_ENABLE_STT, True),
+        ): bool,
+        vol.Optional(
+            CONF_ENABLE_TTS,
+            default=options.get(CONF_ENABLE_TTS, True),
+        ): bool,
+        vol.Optional(
             CONF_PROMPT,
             description={"suggested_value": options.get(CONF_PROMPT, DEFAULT_PROMPT)},
         ): TemplateSelector(),
@@ -235,60 +250,76 @@ async def groq_config_option_schema(
                 for voice in TTS_VOICES_ENGLISH
             ]
 
-        schema.update(
-            {
-                vol.Optional(
-                    CONF_CHAT_MODEL,
-                    description={"suggested_value": options.get(CONF_CHAT_MODEL)},
-                    default=RECOMMENDED_CHAT_MODEL,
-                ): SelectSelector(
-                    SelectSelectorConfig(
-                        mode=SelectSelectorMode.DROPDOWN, options=chat_model_options
-                    )
-                ),
-                vol.Optional(
-                    CONF_TEMPERATURE,
-                    description={"suggested_value": options.get(CONF_TEMPERATURE)},
-                    default=RECOMMENDED_TEMPERATURE,
-                ): NumberSelector(NumberSelectorConfig(min=0, max=2, step=0.05)),
-                vol.Optional(
-                    CONF_TOP_P,
-                    description={"suggested_value": options.get(CONF_TOP_P)},
-                    default=RECOMMENDED_TOP_P,
-                ): NumberSelector(NumberSelectorConfig(min=0, max=1, step=0.05)),
-                vol.Optional(
-                    CONF_MAX_TOKENS,
-                    description={"suggested_value": options.get(CONF_MAX_TOKENS)},
-                    default=RECOMMENDED_MAX_TOKENS,
-                ): NumberSelector(NumberSelectorConfig(min=1, max=32768, step=1)),
-                vol.Optional(
-                    CONF_STT_MODEL,
-                    description={"suggested_value": options.get(CONF_STT_MODEL)},
-                    default=RECOMMENDED_STT_MODEL,
-                ): SelectSelector(
-                    SelectSelectorConfig(
-                        mode=SelectSelectorMode.DROPDOWN, options=stt_model_options
-                    )
-                ),
-                vol.Optional(
-                    CONF_TTS_MODEL,
-                    description={"suggested_value": options.get(CONF_TTS_MODEL)},
-                    default=RECOMMENDED_TTS_MODEL,
-                ): SelectSelector(
-                    SelectSelectorConfig(
-                        mode=SelectSelectorMode.DROPDOWN, options=tts_model_options
-                    )
-                ),
-                vol.Optional(
-                    CONF_TTS_VOICE,
-                    description={"suggested_value": options.get(CONF_TTS_VOICE)},
-                    default=RECOMMENDED_TTS_VOICE,
-                ): SelectSelector(
-                    SelectSelectorConfig(
-                        mode=SelectSelectorMode.DROPDOWN, options=voice_options
-                    )
-                ),
-            }
-        )
+        # Only show conversation options if enabled
+        if options.get(CONF_ENABLE_CONVERSATION, True):
+            schema.update(
+                {
+                    vol.Optional(
+                        CONF_CHAT_MODEL,
+                        description={"suggested_value": options.get(CONF_CHAT_MODEL)},
+                        default=RECOMMENDED_CHAT_MODEL,
+                    ): SelectSelector(
+                        SelectSelectorConfig(
+                            mode=SelectSelectorMode.DROPDOWN, options=chat_model_options
+                        )
+                    ),
+                    vol.Optional(
+                        CONF_TEMPERATURE,
+                        description={"suggested_value": options.get(CONF_TEMPERATURE)},
+                        default=RECOMMENDED_TEMPERATURE,
+                    ): NumberSelector(NumberSelectorConfig(min=0, max=2, step=0.05)),
+                    vol.Optional(
+                        CONF_TOP_P,
+                        description={"suggested_value": options.get(CONF_TOP_P)},
+                        default=RECOMMENDED_TOP_P,
+                    ): NumberSelector(NumberSelectorConfig(min=0, max=1, step=0.05)),
+                    vol.Optional(
+                        CONF_MAX_TOKENS,
+                        description={"suggested_value": options.get(CONF_MAX_TOKENS)},
+                        default=RECOMMENDED_MAX_TOKENS,
+                    ): NumberSelector(NumberSelectorConfig(min=1, max=32768, step=1)),
+                }
+            )
+
+        # Only show STT options if enabled
+        if options.get(CONF_ENABLE_STT, True):
+            schema.update(
+                {
+                    vol.Optional(
+                        CONF_STT_MODEL,
+                        description={"suggested_value": options.get(CONF_STT_MODEL)},
+                        default=RECOMMENDED_STT_MODEL,
+                    ): SelectSelector(
+                        SelectSelectorConfig(
+                            mode=SelectSelectorMode.DROPDOWN, options=stt_model_options
+                        )
+                    ),
+                }
+            )
+
+        # Only show TTS options if enabled
+        if options.get(CONF_ENABLE_TTS, True):
+            schema.update(
+                {
+                    vol.Optional(
+                        CONF_TTS_MODEL,
+                        description={"suggested_value": options.get(CONF_TTS_MODEL)},
+                        default=RECOMMENDED_TTS_MODEL,
+                    ): SelectSelector(
+                        SelectSelectorConfig(
+                            mode=SelectSelectorMode.DROPDOWN, options=tts_model_options
+                        )
+                    ),
+                    vol.Optional(
+                        CONF_TTS_VOICE,
+                        description={"suggested_value": options.get(CONF_TTS_VOICE)},
+                        default=RECOMMENDED_TTS_VOICE,
+                    ): SelectSelector(
+                        SelectSelectorConfig(
+                            mode=SelectSelectorMode.DROPDOWN, options=voice_options
+                        )
+                    ),
+                }
+            )
 
     return schema

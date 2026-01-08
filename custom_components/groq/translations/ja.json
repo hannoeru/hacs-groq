@@ -28,6 +28,9 @@
         "title": "Groq AI を設定",
         "description": "Groq AI 会話エージェントの設定をカスタマイズします。",
         "data": {
+          "enable_conversation": "会話エージェントを有効化",
+          "enable_stt": "音声認識を有効化",
+          "enable_tts": "音声合成を有効化",
           "prompt": "システムプロンプト",
           "llm_hass_api": "Home Assistant API（デバイス制御のためのツール呼び出しを有効化）",
           "recommended": "推奨設定を使用",

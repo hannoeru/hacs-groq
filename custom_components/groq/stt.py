@@ -39,11 +39,12 @@ class GroqSTTEntity(stt.SpeechToTextEntity):
         self.entry = config_entry
         self._attr_unique_id = f"{config_entry.entry_id}_stt"
         self._attr_device_info = {
-            "identifiers": {(DOMAIN, config_entry.entry_id)},
-            "name": config_entry.title,
+            "identifiers": {(DOMAIN, f"{config_entry.entry_id}_stt")},
+            "name": "Speech to Text",
             "manufacturer": "Groq",
-            "model": "Speech to Text",
+            "model": "Whisper",
             "entry_type": "service",
+            "via_device": (DOMAIN, config_entry.entry_id),
         }
 
     @property

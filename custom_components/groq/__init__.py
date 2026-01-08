@@ -9,12 +9,18 @@ from homeassistant.exceptions import (
     ConfigEntryAuthFailed,
     ConfigEntryNotReady,
 )
-from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import config_validation as cv, device_registry as dr
 from homeassistant.helpers.typing import ConfigType
 
 from groq import APIError, AsyncGroq, AuthenticationError  # type: ignore[attr-defined]
 
-from .const import DOMAIN, LOGGER
+from .const import (
+    CONF_ENABLE_CONVERSATION,
+    CONF_ENABLE_STT,
+    CONF_ENABLE_TTS,
+    DOMAIN,
+    LOGGER,
+)
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 PLATFORMS = (
@@ -50,7 +56,30 @@ async def async_setup_entry(hass: HomeAssistant, entry: GroqConfigEntry) -> bool
     else:
         entry.runtime_data = client
 
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    # Create parent integration device
+    device_registry = dr.async_get(hass)
+    device_registry.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, entry.entry_id)},
+        name=entry.title,
+        manufacturer="Groq",
+        model="AI Services",
+        entry_type=dr.DeviceEntryType.SERVICE,
+    )
+
+    # Determine which platforms to load based on user configuration
+    platforms_to_load = []
+    options = entry.options
+
+    if options.get(CONF_ENABLE_CONVERSATION, True):
+        platforms_to_load.append(Platform.CONVERSATION)
+    if options.get(CONF_ENABLE_STT, True):
+        platforms_to_load.append(Platform.STT)
+    if options.get(CONF_ENABLE_TTS, True):
+        platforms_to_load.append(Platform.TTS)
+
+    if platforms_to_load:
+        await hass.config_entries.async_forward_entry_setups(entry, platforms_to_load)
 
     entry.async_on_unload(entry.add_update_listener(async_update_options))
 
@@ -59,7 +88,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: GroqConfigEntry) -> bool
 
 async def async_unload_entry(hass: HomeAssistant, entry: GroqConfigEntry) -> bool:
     """Unload Groq AI."""
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    # Determine which platforms were loaded
+    platforms_to_unload = []
+    options = entry.options
+
+    if options.get(CONF_ENABLE_CONVERSATION, True):
+        platforms_to_unload.append(Platform.CONVERSATION)
+    if options.get(CONF_ENABLE_STT, True):
+        platforms_to_unload.append(Platform.STT)
+    if options.get(CONF_ENABLE_TTS, True):
+        platforms_to_unload.append(Platform.TTS)
+
+    if not platforms_to_unload:
+        return True
+
+    return await hass.config_entries.async_unload_platforms(entry, platforms_to_unload)
 
 
 async def async_update_options(hass: HomeAssistant, entry: GroqConfigEntry) -> None:
