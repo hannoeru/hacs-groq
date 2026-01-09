@@ -2,8 +2,11 @@
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![GitHub Release](https://img.shields.io/github/release/hannoeru/hacs-groq.svg)](https://github.com/hannoeru/hacs-groq/releases)
+[![Validate](https://github.com/hannoeru/hacs-groq/actions/workflows/validate.yml/badge.svg)](https://github.com/hannoeru/hacs-groq/actions/workflows/validate.yml)
 
 A Home Assistant custom integration that brings Groq's ultra-fast LLM inference, speech-to-text, and text-to-speech capabilities to your smart home.
+
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=hannoeru&repository=hacs-groq&category=integration)
 
 ## Features
 
@@ -36,6 +39,10 @@ The integration dynamically fetches available models from the Groq API, ensuring
 ## Installation
 
 ### HACS (Recommended)
+
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=hannoeru&repository=hacs-groq&category=integration)
+
+**Or manually:**
 
 1. Open HACS in your Home Assistant instance
 2. Click on "Integrations"
