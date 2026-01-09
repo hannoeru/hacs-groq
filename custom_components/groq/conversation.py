@@ -14,6 +14,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import llm
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from voluptuous_openapi import convert  # type: ignore[import-not-found]
 
 from groq import AsyncGroq
 from groq.types.chat import ChatCompletionChunk
@@ -83,6 +84,18 @@ def _convert_messages(
             )
 
     return messages
+
+
+def _format_tool(tool: llm.Tool, custom_serializer) -> dict:
+    """Format tool specification for Groq API."""
+    return {
+        "type": "function",
+        "function": {
+            "name": tool.name,
+            "description": tool.description,
+            "parameters": convert(tool.parameters, custom_serializer=custom_serializer),
+        },
+    }
 
 
 async def _transform_stream(  # noqa: PLR0912
@@ -231,14 +244,7 @@ class GroqConversationEntity(
         tools = None
         if chat_log.llm_api:
             tools = [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": tool.name,
-                        "description": tool.description,
-                        "parameters": tool.parameters,
-                    },
-                }
+                _format_tool(tool, chat_log.llm_api.custom_serializer)
                 for tool in chat_log.llm_api.tools
             ]
 

@@ -3,16 +3,19 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, cast
 
 from homeassistant.config_entries import (
     SOURCE_REAUTH,
+    ConfigEntry,
+    ConfigEntryState,
     ConfigFlow,
     ConfigFlowResult,
-    OptionsFlow,
+    ConfigSubentryFlow,
+    SubentryFlowResult,
 )
 from homeassistant.const import CONF_API_KEY, CONF_LLM_HASS_API, CONF_NAME
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import llm
 from homeassistant.helpers.selector import (
     NumberSelector,
@@ -30,9 +33,6 @@ from groq import APIError, AsyncGroq, AuthenticationError
 from .const import (
     CHAT_MODELS,
     CONF_CHAT_MODEL,
-    CONF_ENABLE_CONVERSATION,
-    CONF_ENABLE_STT,
-    CONF_ENABLE_TTS,
     CONF_MAX_TOKENS,
     CONF_PROMPT,
     CONF_RECOMMENDED,
@@ -41,16 +41,22 @@ from .const import (
     CONF_TOP_P,
     CONF_TTS_MODEL,
     CONF_TTS_VOICE,
+    DEFAULT_CONVERSATION_NAME,
     DEFAULT_PROMPT,
+    DEFAULT_STT_NAME,
+    DEFAULT_STT_PROMPT,
     DEFAULT_TITLE,
+    DEFAULT_TTS_NAME,
     DOMAIN,
     RECOMMENDED_CHAT_MODEL,
     RECOMMENDED_CONVERSATION_OPTIONS,
     RECOMMENDED_MAX_TOKENS,
     RECOMMENDED_STT_MODEL,
+    RECOMMENDED_STT_OPTIONS,
     RECOMMENDED_TEMPERATURE,
     RECOMMENDED_TOP_P,
     RECOMMENDED_TTS_MODEL,
+    RECOMMENDED_TTS_OPTIONS,
     RECOMMENDED_TTS_VOICE,
     STT_MODELS,
     TTS_MODELS,
@@ -59,7 +65,7 @@ from .const import (
 )
 from .helpers import get_available_models
 
-STEP_USER_DATA_SCHEMA = vol.Schema(
+STEP_API_DATA_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_API_KEY): str,
     }
@@ -78,7 +84,7 @@ class GroqConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
 
     VERSION = 1
 
-    async def async_step_user(
+    async def async_step_api(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Handle the initial step."""
@@ -102,14 +108,39 @@ class GroqConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
                 return self.async_create_entry(
                     title=DEFAULT_TITLE,
                     data=user_input,
-                    options=RECOMMENDED_CONVERSATION_OPTIONS,
+                    subentries=[
+                        {
+                            "subentry_type": "conversation",
+                            "data": RECOMMENDED_CONVERSATION_OPTIONS,
+                            "title": DEFAULT_CONVERSATION_NAME,
+                            "unique_id": None,
+                        },
+                        {
+                            "subentry_type": "tts",
+                            "data": RECOMMENDED_TTS_OPTIONS,
+                            "title": DEFAULT_TTS_NAME,
+                            "unique_id": None,
+                        },
+                        {
+                            "subentry_type": "stt",
+                            "data": RECOMMENDED_STT_OPTIONS,
+                            "title": DEFAULT_STT_NAME,
+                            "unique_id": None,
+                        },
+                    ],
                 )
         return self.async_show_form(
-            step_id="user",
-            data_schema=STEP_USER_DATA_SCHEMA,
+            step_id="api",
+            data_schema=STEP_API_DATA_SCHEMA,
             description_placeholders={"api_key_url": "https://console.groq.com/keys"},
             errors=errors,
         )
+
+    async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle the initial step."""
+        return await self.async_step_api()
 
     async def async_step_reauth(
         self, entry_data: Mapping[str, Any]
@@ -122,54 +153,110 @@ class GroqConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
     ) -> ConfigFlowResult:
         """Dialog that informs the user that reauth is required."""
         if user_input is not None:
-            return await self.async_step_user()
+            return await self.async_step_api()
 
         reauth_entry = self._get_reauth_entry()
         return self.async_show_form(
             step_id="reauth_confirm",
             description_placeholders={
                 CONF_NAME: reauth_entry.title,
+                CONF_API_KEY: reauth_entry.data.get(CONF_API_KEY, ""),
             },
         )
 
-    @staticmethod
-    def async_get_options_flow(config_entry):
-        """Get the options flow for this handler."""
-        return GroqOptionsFlow(config_entry)
+    @classmethod
+    @callback
+    def async_get_supported_subentry_types(
+        cls, config_entry: ConfigEntry  # noqa: ARG003
+    ) -> dict[str, type[ConfigSubentryFlow]]:
+        """Return subentries supported by this integration."""
+        return {
+            "conversation": GroqSubentryFlowHandler,
+            "stt": GroqSubentryFlowHandler,
+            "tts": GroqSubentryFlowHandler,
+        }
 
 
-class GroqOptionsFlow(OptionsFlow):
-    """Handle options flow for Groq AI."""
+class GroqSubentryFlowHandler(ConfigSubentryFlow):
+    """Flow for managing Groq subentries."""
 
     last_rendered_recommended = False
 
-    async def async_step_init(
+    @property
+    def _groq_client(self) -> AsyncGroq:
+        """Return the Groq client."""
+        return self._get_entry().runtime_data
+
+    @property
+    def _is_new(self) -> bool:
+        """Return if this is a new subentry."""
+        return self.source == "user"
+
+    async def async_step_set_options(
         self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        """Manage the options."""
+    ) -> SubentryFlowResult:
+        """Set subentry options."""
+        # Abort if entry is not loaded
+        if self._get_entry().state != ConfigEntryState.LOADED:
+            return self.async_abort(reason="entry_not_loaded")
+
         errors: dict[str, str] = {}
 
         if user_input is None:
-            options = self.config_entry.options.copy()
-            self.last_rendered_recommended = options.get(CONF_RECOMMENDED, False)
+            if self._is_new:
+                options: dict[str, Any]
+                if self._subentry_type == "tts":
+                    options = RECOMMENDED_TTS_OPTIONS.copy()
+                elif self._subentry_type == "stt":
+                    options = RECOMMENDED_STT_OPTIONS.copy()
+                else:
+                    options = RECOMMENDED_CONVERSATION_OPTIONS.copy()
+            else:
+                # If this is a reconfiguration, copy existing options
+                options = self._get_reconfigure_subentry().data.copy()
+
+            self.last_rendered_recommended = cast(
+                "bool", options.get(CONF_RECOMMENDED, False)
+            )
+
         else:
             if user_input[CONF_RECOMMENDED] == self.last_rendered_recommended:
                 if not user_input.get(CONF_LLM_HASS_API):
                     user_input.pop(CONF_LLM_HASS_API, None)
-                return self.async_create_entry(title="", data=user_input)
+
+                if self._is_new:
+                    return self.async_create_entry(
+                        title=user_input.pop(CONF_NAME),
+                        data=user_input,
+                    )
+
+                return self.async_update_and_abort(
+                    self._get_entry(),
+                    self._get_reconfigure_subentry(),
+                    data=user_input,
+                )
 
             # Re-render the options again, now with the recommended options shown/hidden
             self.last_rendered_recommended = user_input[CONF_RECOMMENDED]
             options = user_input
 
-        schema = await groq_config_option_schema(self.hass, options, self.config_entry)
+        schema = await groq_config_option_schema(
+            self.hass, self._is_new, self._subentry_type, options, self._groq_client
+        )
         return self.async_show_form(
-            step_id="init", data_schema=vol.Schema(schema), errors=errors
+            step_id="set_options", data_schema=vol.Schema(schema), errors=errors
         )
 
+    async_step_reconfigure = async_step_set_options
+    async_step_user = async_step_set_options
 
-async def groq_config_option_schema(
-    hass: HomeAssistant, options: Mapping[str, Any], config_entry=None
+
+async def groq_config_option_schema(  # noqa: PLR0912
+    hass: HomeAssistant,
+    is_new: bool,
+    subentry_type: str,
+    options: Mapping[str, Any],
+    groq_client: AsyncGroq,
 ) -> dict:
     """Return a schema for Groq completion options."""
     hass_apis: list[SelectOptionDict] = [
@@ -179,24 +266,74 @@ async def groq_config_option_schema(
         )
         for api in llm.async_get_apis(hass)
     ]
-
     if (suggested_llm_apis := options.get(CONF_LLM_HASS_API)) and isinstance(
         suggested_llm_apis, str
     ):
         suggested_llm_apis = [suggested_llm_apis]
 
-    # Fetch available models dynamically if we have a config entry
-    chat_models = CHAT_MODELS
-    stt_models = STT_MODELS
-    tts_models = TTS_MODELS
+    if is_new:
+        if CONF_NAME in options:
+            default_name = options[CONF_NAME]
+        elif subentry_type == "tts":
+            default_name = DEFAULT_TTS_NAME
+        elif subentry_type == "stt":
+            default_name = DEFAULT_STT_NAME
+        else:
+            default_name = DEFAULT_CONVERSATION_NAME
+        schema: dict[vol.Required | vol.Optional, Any] = {
+            vol.Required(CONF_NAME, default=default_name): str,
+        }
+    else:
+        schema = {}
 
-    if config_entry is not None:
-        try:
-            client = AsyncGroq(api_key=config_entry.data[CONF_API_KEY])
-            chat_models, stt_models, tts_models = await get_available_models(client)
-        except Exception:
-            # Fall back to static lists if fetching fails
-            pass
+    if subentry_type == "conversation":
+        schema.update(
+            {
+                vol.Optional(
+                    CONF_PROMPT,
+                    description={
+                        "suggested_value": options.get(CONF_PROMPT, DEFAULT_PROMPT)
+                    },
+                ): TemplateSelector(),
+                vol.Optional(
+                    CONF_LLM_HASS_API,
+                    description={"suggested_value": suggested_llm_apis},
+                ): SelectSelector(
+                    SelectSelectorConfig(options=hass_apis, multiple=True)
+                ),
+            }
+        )
+    elif subentry_type == "stt":
+        schema.update(
+            {
+                vol.Optional(
+                    CONF_PROMPT,
+                    description={
+                        "suggested_value": options.get(CONF_PROMPT, DEFAULT_STT_PROMPT)
+                    },
+                ): TemplateSelector(),
+            }
+        )
+
+    schema.update(
+        {
+            vol.Required(
+                CONF_RECOMMENDED, default=options.get(CONF_RECOMMENDED, False)
+            ): bool,
+        }
+    )
+
+    if options.get(CONF_RECOMMENDED):
+        return schema
+
+    # Fetch available models dynamically
+    try:
+        chat_models, stt_models, tts_models = await get_available_models(groq_client)
+    except Exception:
+        # Fall back to static lists if fetching fails
+        chat_models = CHAT_MODELS
+        stt_models = STT_MODELS
+        tts_models = TTS_MODELS
 
     chat_model_options = [
         SelectOptionDict(label=model, value=model) for model in chat_models
@@ -210,116 +347,98 @@ async def groq_config_option_schema(
         SelectOptionDict(label=model, value=model) for model in tts_models
     ]
 
-    schema: dict[vol.Required | vol.Optional, Any] = {
-        vol.Optional(
-            CONF_ENABLE_CONVERSATION,
-            default=options.get(CONF_ENABLE_CONVERSATION, True),
-        ): bool,
-        vol.Optional(
-            CONF_ENABLE_STT,
-            default=options.get(CONF_ENABLE_STT, True),
-        ): bool,
-        vol.Optional(
-            CONF_ENABLE_TTS,
-            default=options.get(CONF_ENABLE_TTS, True),
-        ): bool,
-        vol.Optional(
-            CONF_PROMPT,
-            description={"suggested_value": options.get(CONF_PROMPT, DEFAULT_PROMPT)},
-        ): TemplateSelector(),
-        vol.Optional(
-            CONF_LLM_HASS_API,
-            description={"suggested_value": suggested_llm_apis},
-        ): SelectSelector(SelectSelectorConfig(options=hass_apis, multiple=True)),
-        vol.Required(
-            CONF_RECOMMENDED, default=options.get(CONF_RECOMMENDED, False)
-        ): bool,
-    }
+    # Get voice options based on TTS model
+    tts_model = options.get(CONF_TTS_MODEL, RECOMMENDED_TTS_MODEL)
+    if "arabic" in tts_model.lower():
+        voice_options = [
+            SelectOptionDict(label=voice, value=voice) for voice in TTS_VOICES_ARABIC
+        ]
+    else:
+        voice_options = [
+            SelectOptionDict(label=voice, value=voice) for voice in TTS_VOICES_ENGLISH
+        ]
 
-    if not options.get(CONF_RECOMMENDED):
-        # Get voice options based on TTS model
-        tts_model = options.get(CONF_TTS_MODEL, RECOMMENDED_TTS_MODEL)
-        if "arabic" in tts_model.lower():
-            voice_options = [
-                SelectOptionDict(label=voice, value=voice)
-                for voice in TTS_VOICES_ARABIC
-            ]
-        else:
-            voice_options = [
-                SelectOptionDict(label=voice, value=voice)
-                for voice in TTS_VOICES_ENGLISH
-            ]
+    if subentry_type == "tts":
+        default_model = RECOMMENDED_TTS_MODEL
+    elif subentry_type == "stt":
+        default_model = RECOMMENDED_STT_MODEL
+    else:
+        default_model = RECOMMENDED_CHAT_MODEL
 
-        # Only show conversation options if enabled
-        if options.get(CONF_ENABLE_CONVERSATION, True):
-            schema.update(
-                {
-                    vol.Optional(
-                        CONF_CHAT_MODEL,
-                        description={"suggested_value": options.get(CONF_CHAT_MODEL)},
-                        default=RECOMMENDED_CHAT_MODEL,
-                    ): SelectSelector(
-                        SelectSelectorConfig(
-                            mode=SelectSelectorMode.DROPDOWN, options=chat_model_options
+    schema.update(
+        {
+            vol.Optional(
+                CONF_CHAT_MODEL,
+                description={"suggested_value": options.get(CONF_CHAT_MODEL)},
+                default=default_model,
+            ): SelectSelector(
+                SelectSelectorConfig(
+                    mode=SelectSelectorMode.DROPDOWN,
+                    options=(
+                        chat_model_options
+                        if subentry_type == "conversation"
+                        else (
+                            stt_model_options
+                            if subentry_type == "stt"
+                            else tts_model_options
                         )
                     ),
-                    vol.Optional(
-                        CONF_TEMPERATURE,
-                        description={"suggested_value": options.get(CONF_TEMPERATURE)},
-                        default=RECOMMENDED_TEMPERATURE,
-                    ): NumberSelector(NumberSelectorConfig(min=0, max=2, step=0.05)),
-                    vol.Optional(
-                        CONF_TOP_P,
-                        description={"suggested_value": options.get(CONF_TOP_P)},
-                        default=RECOMMENDED_TOP_P,
-                    ): NumberSelector(NumberSelectorConfig(min=0, max=1, step=0.05)),
-                    vol.Optional(
-                        CONF_MAX_TOKENS,
-                        description={"suggested_value": options.get(CONF_MAX_TOKENS)},
-                        default=RECOMMENDED_MAX_TOKENS,
-                    ): NumberSelector(NumberSelectorConfig(min=1, max=32768, step=1)),
-                }
-            )
+                )
+            ),
+            vol.Optional(
+                CONF_TEMPERATURE,
+                description={"suggested_value": options.get(CONF_TEMPERATURE)},
+                default=RECOMMENDED_TEMPERATURE,
+            ): NumberSelector(NumberSelectorConfig(min=0, max=2, step=0.05)),
+            vol.Optional(
+                CONF_TOP_P,
+                description={"suggested_value": options.get(CONF_TOP_P)},
+                default=RECOMMENDED_TOP_P,
+            ): NumberSelector(NumberSelectorConfig(min=0, max=1, step=0.05)),
+            vol.Optional(
+                CONF_MAX_TOKENS,
+                description={"suggested_value": options.get(CONF_MAX_TOKENS)},
+                default=RECOMMENDED_MAX_TOKENS,
+            ): NumberSelector(NumberSelectorConfig(min=1, max=32768, step=1)),
+        }
+    )
 
-        # Only show STT options if enabled
-        if options.get(CONF_ENABLE_STT, True):
-            schema.update(
-                {
-                    vol.Optional(
-                        CONF_STT_MODEL,
-                        description={"suggested_value": options.get(CONF_STT_MODEL)},
-                        default=RECOMMENDED_STT_MODEL,
-                    ): SelectSelector(
-                        SelectSelectorConfig(
-                            mode=SelectSelectorMode.DROPDOWN, options=stt_model_options
-                        )
-                    ),
-                }
-            )
-
-        # Only show TTS options if enabled
-        if options.get(CONF_ENABLE_TTS, True):
-            schema.update(
-                {
-                    vol.Optional(
-                        CONF_TTS_MODEL,
-                        description={"suggested_value": options.get(CONF_TTS_MODEL)},
-                        default=RECOMMENDED_TTS_MODEL,
-                    ): SelectSelector(
-                        SelectSelectorConfig(
-                            mode=SelectSelectorMode.DROPDOWN, options=tts_model_options
-                        )
-                    ),
-                    vol.Optional(
-                        CONF_TTS_VOICE,
-                        description={"suggested_value": options.get(CONF_TTS_VOICE)},
-                        default=RECOMMENDED_TTS_VOICE,
-                    ): SelectSelector(
-                        SelectSelectorConfig(
-                            mode=SelectSelectorMode.DROPDOWN, options=voice_options
-                        )
-                    ),
-                }
-            )
+    if subentry_type == "tts":
+        schema.update(
+            {
+                vol.Optional(
+                    CONF_TTS_MODEL,
+                    description={"suggested_value": options.get(CONF_TTS_MODEL)},
+                    default=RECOMMENDED_TTS_MODEL,
+                ): SelectSelector(
+                    SelectSelectorConfig(
+                        mode=SelectSelectorMode.DROPDOWN, options=tts_model_options
+                    )
+                ),
+                vol.Optional(
+                    CONF_TTS_VOICE,
+                    description={"suggested_value": options.get(CONF_TTS_VOICE)},
+                    default=RECOMMENDED_TTS_VOICE,
+                ): SelectSelector(
+                    SelectSelectorConfig(
+                        mode=SelectSelectorMode.DROPDOWN, options=voice_options
+                    )
+                ),
+            }
+        )
+    elif subentry_type == "stt":
+        schema.update(
+            {
+                vol.Optional(
+                    CONF_STT_MODEL,
+                    description={"suggested_value": options.get(CONF_STT_MODEL)},
+                    default=RECOMMENDED_STT_MODEL,
+                ): SelectSelector(
+                    SelectSelectorConfig(
+                        mode=SelectSelectorMode.DROPDOWN, options=stt_model_options
+                    )
+                ),
+            }
+        )
 
     return schema

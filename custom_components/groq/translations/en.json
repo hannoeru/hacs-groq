@@ -24,17 +24,15 @@
   },
   "options": {
     "step": {
-      "init": {
-        "title": "Configure Groq AI",
-        "description": "Customize your Groq AI conversation agent settings.",
+      "set_options": {
+        "title": "Configure Service",
+        "description": "Customize settings for this Groq AI service.",
         "data": {
-          "enable_conversation": "Enable Conversation Agent",
-          "enable_stt": "Enable Speech-to-Text",
-          "enable_tts": "Enable Text-to-Speech",
+          "name": "Name",
           "prompt": "System Prompt",
           "llm_hass_api": "Home Assistant APIs (enable tool calling for device control)",
           "recommended": "Use recommended settings",
-          "chat_model": "Chat Model",
+          "chat_model": "Model",
           "temperature": "Temperature (0 = focused, 2 = creative)",
           "top_p": "Top P (nucleus sampling)",
           "max_tokens": "Max Tokens (maximum response length)",
@@ -43,6 +41,9 @@
           "tts_voice": "Text-to-Speech Voice"
         }
       }
+    },
+    "error": {
+      "entry_not_loaded": "The integration is not loaded. Please try again later."
     }
   },
   "entity": {
