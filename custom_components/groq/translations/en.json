@@ -61,8 +61,7 @@
             "name": "Name",
             "prompt": "System Prompt",
             "llm_hass_api": "Home Assistant APIs (enable tool calling for device control)",
-            "recommended": "Use recommended settings",
-            "chat_model": "Model",
+            "chat_model": "Chat Model",
             "temperature": "Temperature (0 = focused, 2 = creative)",
             "top_p": "Top P (nucleus sampling)",
             "max_tokens": "Max Tokens (maximum response length)"
@@ -87,12 +86,10 @@
           "data": {
             "name": "Name",
             "prompt": "System Prompt",
-            "recommended": "Use recommended settings",
-            "chat_model": "Model",
+            "stt_model": "Speech-to-Text Model",
             "temperature": "Temperature (0 = focused, 2 = creative)",
             "top_p": "Top P (nucleus sampling)",
-            "max_tokens": "Max Tokens (maximum response length)",
-            "stt_model": "Speech-to-Text Model"
+            "max_tokens": "Max Tokens (maximum response length)"
           }
         }
       },
@@ -113,13 +110,11 @@
           "description": "Customize settings for the Groq TTS service.",
           "data": {
             "name": "Name",
-            "recommended": "Use recommended settings",
-            "chat_model": "Model",
+            "tts_model": "Text-to-Speech Model",
+            "tts_voice": "Text-to-Speech Voice",
             "temperature": "Temperature (0 = focused, 2 = creative)",
             "top_p": "Top P (nucleus sampling)",
-            "max_tokens": "Max Tokens (maximum response length)",
-            "tts_model": "Text-to-Speech Model",
-            "tts_voice": "Text-to-Speech Voice"
+            "max_tokens": "Max Tokens (maximum response length)"
           }
         }
       },

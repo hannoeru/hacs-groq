@@ -61,8 +61,7 @@
             "name": "名称",
             "prompt": "系统提示",
             "llm_hass_api": "Home Assistant API（启用工具调用以控制设备）",
-            "recommended": "使用推荐设置",
-            "chat_model": "模型",
+            "chat_model": "聊天模型",
             "temperature": "温度（0 = 聚焦，2 = 创造性）",
             "top_p": "Top P（核采样）",
             "max_tokens": "最大令牌数（最大响应长度）"
@@ -87,12 +86,10 @@
           "data": {
             "name": "名称",
             "prompt": "系统提示",
-            "recommended": "使用推荐设置",
-            "chat_model": "模型",
+            "stt_model": "语音转文字模型",
             "temperature": "温度（0 = 聚焦，2 = 创造性）",
             "top_p": "Top P（核采样）",
-            "max_tokens": "最大令牌数（最大响应长度）",
-            "stt_model": "语音转文字模型"
+            "max_tokens": "最大令牌数（最大响应长度）"
           }
         }
       },
@@ -113,13 +110,11 @@
           "description": "自定义 Groq 文字转语音服务的设置。",
           "data": {
             "name": "名称",
-            "recommended": "使用推荐设置",
-            "chat_model": "模型",
+            "tts_model": "文字转语音模型",
+            "tts_voice": "文字转语音声音",
             "temperature": "温度（0 = 聚焦，2 = 创造性）",
             "top_p": "Top P（核采样）",
-            "max_tokens": "最大令牌数（最大响应长度）",
-            "tts_model": "文字转语音模型",
-            "tts_voice": "文字转语音声音"
+            "max_tokens": "最大令牌数（最大响应长度）"
           }
         }
       },

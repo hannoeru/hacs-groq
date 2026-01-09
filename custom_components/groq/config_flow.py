@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, cast
+from typing import Any
 
 from homeassistant.config_entries import (
     SOURCE_REAUTH,
@@ -35,7 +35,6 @@ from .const import (
     CONF_CHAT_MODEL,
     CONF_MAX_TOKENS,
     CONF_PROMPT,
-    CONF_RECOMMENDED,
     CONF_STT_MODEL,
     CONF_TEMPERATURE,
     CONF_TOP_P,
@@ -180,8 +179,6 @@ class GroqConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
 class GroqSubentryFlowHandler(ConfigSubentryFlow):
     """Flow for managing Groq subentries."""
 
-    last_rendered_recommended = False
-
     @property
     def _groq_client(self) -> AsyncGroq:
         """Return the Groq client."""
@@ -215,30 +212,21 @@ class GroqSubentryFlowHandler(ConfigSubentryFlow):
                 # If this is a reconfiguration, copy existing options
                 options = self._get_reconfigure_subentry().data.copy()
 
-            self.last_rendered_recommended = cast(
-                "bool", options.get(CONF_RECOMMENDED, False)
-            )
-
         else:
-            if user_input[CONF_RECOMMENDED] == self.last_rendered_recommended:
-                if not user_input.get(CONF_LLM_HASS_API):
-                    user_input.pop(CONF_LLM_HASS_API, None)
+            if not user_input.get(CONF_LLM_HASS_API):
+                user_input.pop(CONF_LLM_HASS_API, None)
 
-                if self._is_new:
-                    return self.async_create_entry(
-                        title=user_input.pop(CONF_NAME),
-                        data=user_input,
-                    )
-
-                return self.async_update_and_abort(
-                    self._get_entry(),
-                    self._get_reconfigure_subentry(),
+            if self._is_new:
+                return self.async_create_entry(
+                    title=user_input.pop(CONF_NAME),
                     data=user_input,
                 )
 
-            # Re-render the options again, now with the recommended options shown/hidden
-            self.last_rendered_recommended = user_input[CONF_RECOMMENDED]
-            options = user_input
+            return self.async_update_and_abort(
+                self._get_entry(),
+                self._get_reconfigure_subentry(),
+                data=user_input,
+            )
 
         schema = await groq_config_option_schema(
             self.hass, self._is_new, self._subentry_type, options, self._groq_client
@@ -315,18 +303,7 @@ async def groq_config_option_schema(  # noqa: PLR0912
             }
         )
 
-    schema.update(
-        {
-            vol.Required(
-                CONF_RECOMMENDED, default=options.get(CONF_RECOMMENDED, False)
-            ): bool,
-        }
-    )
-
-    if options.get(CONF_RECOMMENDED):
-        return schema
-
-    # Fetch available models dynamically
+    # Fetch available models dynamically (needed for model selection)
     try:
         chat_models, stt_models, tts_models = await get_available_models(groq_client)
     except Exception:
@@ -347,44 +324,67 @@ async def groq_config_option_schema(  # noqa: PLR0912
         SelectOptionDict(label=model, value=model) for model in tts_models
     ]
 
-    # Get voice options based on TTS model
-    tts_model = options.get(CONF_TTS_MODEL, RECOMMENDED_TTS_MODEL)
-    if "arabic" in tts_model.lower():
-        voice_options = [
-            SelectOptionDict(label=voice, value=voice) for voice in TTS_VOICES_ARABIC
-        ]
-    else:
-        voice_options = [
-            SelectOptionDict(label=voice, value=voice) for voice in TTS_VOICES_ENGLISH
-        ]
-
+    # Determine the appropriate model field and default based on subentry type
     if subentry_type == "tts":
         default_model = RECOMMENDED_TTS_MODEL
+        model_field = CONF_TTS_MODEL
+        model_options = tts_model_options
     elif subentry_type == "stt":
         default_model = RECOMMENDED_STT_MODEL
+        model_field = CONF_STT_MODEL
+        model_options = stt_model_options
     else:
         default_model = RECOMMENDED_CHAT_MODEL
+        model_field = CONF_CHAT_MODEL
+        model_options = chat_model_options
 
+    # Always show model selector
+    # This allows users to choose the model when adding a service
     schema.update(
         {
             vol.Optional(
-                CONF_CHAT_MODEL,
-                description={"suggested_value": options.get(CONF_CHAT_MODEL)},
+                model_field,
+                description={"suggested_value": options.get(model_field)},
                 default=default_model,
             ): SelectSelector(
                 SelectSelectorConfig(
                     mode=SelectSelectorMode.DROPDOWN,
-                    options=(
-                        chat_model_options
-                        if subentry_type == "conversation"
-                        else (
-                            stt_model_options
-                            if subentry_type == "stt"
-                            else tts_model_options
-                        )
-                    ),
+                    options=model_options,
                 )
             ),
+        }
+    )
+
+    # For TTS, also add voice selector
+    if subentry_type == "tts":
+        # Get voice options based on TTS model
+        tts_model = options.get(CONF_TTS_MODEL, RECOMMENDED_TTS_MODEL)
+        if "arabic" in tts_model.lower():
+            voice_options = [
+                SelectOptionDict(label=voice, value=voice) for voice in TTS_VOICES_ARABIC
+            ]
+        else:
+            voice_options = [
+                SelectOptionDict(label=voice, value=voice) for voice in TTS_VOICES_ENGLISH
+            ]
+
+        schema.update(
+            {
+                vol.Optional(
+                    CONF_TTS_VOICE,
+                    description={"suggested_value": options.get(CONF_TTS_VOICE)},
+                    default=RECOMMENDED_TTS_VOICE,
+                ): SelectSelector(
+                    SelectSelectorConfig(
+                        mode=SelectSelectorMode.DROPDOWN, options=voice_options
+                    )
+                ),
+            }
+        )
+
+    # Always show all advanced parameters
+    schema.update(
+        {
             vol.Optional(
                 CONF_TEMPERATURE,
                 description={"suggested_value": options.get(CONF_TEMPERATURE)},
@@ -402,43 +402,5 @@ async def groq_config_option_schema(  # noqa: PLR0912
             ): NumberSelector(NumberSelectorConfig(min=1, max=32768, step=1)),
         }
     )
-
-    if subentry_type == "tts":
-        schema.update(
-            {
-                vol.Optional(
-                    CONF_TTS_MODEL,
-                    description={"suggested_value": options.get(CONF_TTS_MODEL)},
-                    default=RECOMMENDED_TTS_MODEL,
-                ): SelectSelector(
-                    SelectSelectorConfig(
-                        mode=SelectSelectorMode.DROPDOWN, options=tts_model_options
-                    )
-                ),
-                vol.Optional(
-                    CONF_TTS_VOICE,
-                    description={"suggested_value": options.get(CONF_TTS_VOICE)},
-                    default=RECOMMENDED_TTS_VOICE,
-                ): SelectSelector(
-                    SelectSelectorConfig(
-                        mode=SelectSelectorMode.DROPDOWN, options=voice_options
-                    )
-                ),
-            }
-        )
-    elif subentry_type == "stt":
-        schema.update(
-            {
-                vol.Optional(
-                    CONF_STT_MODEL,
-                    description={"suggested_value": options.get(CONF_STT_MODEL)},
-                    default=RECOMMENDED_STT_MODEL,
-                ): SelectSelector(
-                    SelectSelectorConfig(
-                        mode=SelectSelectorMode.DROPDOWN, options=stt_model_options
-                    )
-                ),
-            }
-        )
 
     return schema

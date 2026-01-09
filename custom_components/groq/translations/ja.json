@@ -61,8 +61,7 @@
             "name": "名前",
             "prompt": "システムプロンプト",
             "llm_hass_api": "Home Assistant API（デバイス制御のためのツール呼び出しを有効化）",
-            "recommended": "推奨設定を使用",
-            "chat_model": "モデル",
+            "chat_model": "チャットモデル",
             "temperature": "温度（0 = 集中的、2 = 創造的）",
             "top_p": "Top P（ニュークリアスサンプリング）",
             "max_tokens": "最大トークン数（最大応答長）"
@@ -87,12 +86,10 @@
           "data": {
             "name": "名前",
             "prompt": "システムプロンプト",
-            "recommended": "推奨設定を使用",
-            "chat_model": "モデル",
+            "stt_model": "音声認識モデル",
             "temperature": "温度（0 = 集中的、2 = 創造的）",
             "top_p": "Top P（ニュークリアスサンプリング）",
-            "max_tokens": "最大トークン数（最大応答長）",
-            "stt_model": "音声認識モデル"
+            "max_tokens": "最大トークン数（最大応答長）"
           }
         }
       },
@@ -113,13 +110,11 @@
           "description": "Groq 音声合成サービスの設定をカスタマイズします。",
           "data": {
             "name": "名前",
-            "recommended": "推奨設定を使用",
-            "chat_model": "モデル",
+            "tts_model": "音声合成モデル",
+            "tts_voice": "音声合成ボイス",
             "temperature": "温度（0 = 集中的、2 = 創造的）",
             "top_p": "Top P（ニュークリアスサンプリング）",
-            "max_tokens": "最大トークン数（最大応答長）",
-            "tts_model": "音声合成モデル",
-            "tts_voice": "音声合成ボイス"
+            "max_tokens": "最大トークン数（最大応答長）"
           }
         }
       },
