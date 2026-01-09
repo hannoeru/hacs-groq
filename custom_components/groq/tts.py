@@ -11,9 +11,10 @@ from homeassistant.components.tts import (
     TtsAudioType,
     Voice,
 )
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.config_entries import ConfigEntry, ConfigSubentry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from groq import AsyncGroq
@@ -36,33 +37,40 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Groq TTS entities."""
-    async_add_entities([GroqTTSEntity(config_entry)])
+    for subentry in config_entry.subentries.values():
+        if subentry.subentry_type != "tts":
+            continue
+
+        async_add_entities(
+            [GroqTTSEntity(config_entry, subentry)],
+            config_subentry_id=subentry.subentry_id,
+        )
 
 
 class GroqTTSEntity(TextToSpeechEntity):
     """Groq text-to-speech entity."""
 
     _attr_has_entity_name = True
-    _attr_name = "Text to Speech"
+    _attr_name = None
     _attr_supported_options = [ATTR_VOICE]
 
-    def __init__(self, config_entry: ConfigEntry) -> None:
+    def __init__(self, entry: ConfigEntry, subentry: ConfigSubentry) -> None:
         """Initialize the TTS entity."""
-        self.entry = config_entry
-        self._attr_unique_id = f"{config_entry.entry_id}_tts"
-        self._attr_device_info = {
-            "identifiers": {(DOMAIN, f"{config_entry.entry_id}_tts")},
-            "name": "Text to Speech",
-            "manufacturer": "Groq",
-            "model": "Orpheus",
-            "entry_type": "service",
-            "via_device": (DOMAIN, config_entry.entry_id),
-        }
+        self.entry = entry
+        self.subentry = subentry
+        self._attr_unique_id = subentry.subentry_id
+        self._attr_device_info = dr.DeviceInfo(
+            identifiers={(DOMAIN, subentry.subentry_id)},
+            name=subentry.title,
+            manufacturer="Groq",
+            model=subentry.data.get(CONF_TTS_MODEL, RECOMMENDED_TTS_MODEL),
+            entry_type=dr.DeviceEntryType.SERVICE,
+        )
         self._update_voice_list()
 
     def _update_voice_list(self) -> None:
         """Update the voice list based on the configured model."""
-        options = self.entry.options
+        options = self.subentry.data
         model = options.get(CONF_TTS_MODEL, RECOMMENDED_TTS_MODEL)
 
         if "arabic" in model.lower():
@@ -90,7 +98,7 @@ class GroqTTSEntity(TextToSpeechEntity):
     @property
     def default_options(self) -> Mapping[str, Any]:
         """Return a mapping with the default options."""
-        options = self.entry.options
+        options = self.subentry.data
         default_voice = options.get(CONF_TTS_VOICE, RECOMMENDED_TTS_VOICE)
         return {ATTR_VOICE: default_voice}
 
@@ -98,7 +106,7 @@ class GroqTTSEntity(TextToSpeechEntity):
         self, message: str, language: str, options: dict[str, Any]
     ) -> TtsAudioType:
         """Load TTS audio file from the engine."""
-        config_options = self.entry.options
+        config_options = self.subentry.data
         model = config_options.get(CONF_TTS_MODEL, RECOMMENDED_TTS_MODEL)
         voice = options.get(
             ATTR_VOICE, config_options.get(CONF_TTS_VOICE, RECOMMENDED_TTS_VOICE)

@@ -9,7 +9,7 @@ from homeassistant.exceptions import (
     ConfigEntryAuthFailed,
     ConfigEntryNotReady,
 )
-from homeassistant.helpers import config_validation as cv, device_registry as dr
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.typing import ConfigType
 
 from groq import APIError, AsyncGroq, AuthenticationError  # type: ignore[attr-defined]
@@ -49,17 +49,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: GroqConfigEntry) -> bool
         raise ConfigEntryNotReady(f"Unexpected error: {err}") from err
     else:
         entry.runtime_data = client
-
-    # Create parent integration device
-    device_registry = dr.async_get(hass)
-    device_registry.async_get_or_create(
-        config_entry_id=entry.entry_id,
-        identifiers={(DOMAIN, entry.entry_id)},
-        name=entry.title,
-        manufacturer="Groq",
-        model="AI Services",
-        entry_type=dr.DeviceEntryType.SERVICE,
-    )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 

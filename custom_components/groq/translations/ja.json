@@ -24,17 +24,15 @@
   },
   "options": {
     "step": {
-      "init": {
-        "title": "Groq AI を設定",
-        "description": "Groq AI 会話エージェントの設定をカスタマイズします。",
+      "set_options": {
+        "title": "サービスを設定",
+        "description": "この Groq AI サービスの設定をカスタマイズします。",
         "data": {
-          "enable_conversation": "会話エージェントを有効化",
-          "enable_stt": "音声認識を有効化",
-          "enable_tts": "音声合成を有効化",
+          "name": "名前",
           "prompt": "システムプロンプト",
           "llm_hass_api": "Home Assistant API（デバイス制御のためのツール呼び出しを有効化）",
           "recommended": "推奨設定を使用",
-          "chat_model": "チャットモデル",
+          "chat_model": "モデル",
           "temperature": "温度（0 = 集中的、2 = 創造的）",
           "top_p": "Top P（ニュークリアスサンプリング）",
           "max_tokens": "最大トークン数（最大応答長）",
@@ -42,6 +40,92 @@
           "tts_model": "音声合成モデル",
           "tts_voice": "音声合成ボイス"
         }
+      }
+    },
+    "error": {
+      "entry_not_loaded": "統合がロードされていません。後でもう一度お試しください。"
+    }
+  },
+  "config_subentries": {
+    "conversation": {
+      "entry_type": "会話エージェント",
+      "initiate_flow": {
+        "reconfigure": "会話エージェントを再設定",
+        "user": "会話エージェントを追加"
+      },
+      "step": {
+        "set_options": {
+          "title": "会話エージェントを設定",
+          "description": "Groq 会話エージェントの設定をカスタマイズします。",
+          "data": {
+            "name": "名前",
+            "prompt": "システムプロンプト",
+            "llm_hass_api": "Home Assistant API（デバイス制御のためのツール呼び出しを有効化）",
+            "recommended": "推奨設定を使用",
+            "chat_model": "モデル",
+            "temperature": "温度（0 = 集中的、2 = 創造的）",
+            "top_p": "Top P（ニュークリアスサンプリング）",
+            "max_tokens": "最大トークン数（最大応答長）"
+          }
+        }
+      },
+      "abort": {
+        "entry_not_loaded": "統合が無効になっている間はサービスを追加できません。",
+        "reconfigure_successful": "再設定が完了しました"
+      }
+    },
+    "stt": {
+      "entry_type": "音声認識",
+      "initiate_flow": {
+        "reconfigure": "音声認識サービスを再設定",
+        "user": "音声認識サービスを追加"
+      },
+      "step": {
+        "set_options": {
+          "title": "音声認識を設定",
+          "description": "Groq 音声認識サービスの設定をカスタマイズします。",
+          "data": {
+            "name": "名前",
+            "prompt": "システムプロンプト",
+            "recommended": "推奨設定を使用",
+            "chat_model": "モデル",
+            "temperature": "温度（0 = 集中的、2 = 創造的）",
+            "top_p": "Top P（ニュークリアスサンプリング）",
+            "max_tokens": "最大トークン数（最大応答長）",
+            "stt_model": "音声認識モデル"
+          }
+        }
+      },
+      "abort": {
+        "entry_not_loaded": "統合が無効になっている間はサービスを追加できません。",
+        "reconfigure_successful": "再設定が完了しました"
+      }
+    },
+    "tts": {
+      "entry_type": "音声合成",
+      "initiate_flow": {
+        "reconfigure": "音声合成サービスを再設定",
+        "user": "音声合成サービスを追加"
+      },
+      "step": {
+        "set_options": {
+          "title": "音声合成を設定",
+          "description": "Groq 音声合成サービスの設定をカスタマイズします。",
+          "data": {
+            "name": "名前",
+            "recommended": "推奨設定を使用",
+            "chat_model": "モデル",
+            "temperature": "温度（0 = 集中的、2 = 創造的）",
+            "top_p": "Top P（ニュークリアスサンプリング）",
+            "max_tokens": "最大トークン数（最大応答長）",
+            "tts_model": "音声合成モデル",
+            "tts_voice": "音声合成ボイス"
+          }
+        }
+      },
+      "abort": {
+        "entry_not_loaded": "統合が無効になっている間はサービスを追加できません。",
+        "reconfigure_successful": "再設定が完了しました"
       }
     }
   },

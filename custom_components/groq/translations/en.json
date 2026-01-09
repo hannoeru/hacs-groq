@@ -46,6 +46,89 @@
       "entry_not_loaded": "The integration is not loaded. Please try again later."
     }
   },
+  "config_subentries": {
+    "conversation": {
+      "entry_type": "Conversation agent",
+      "initiate_flow": {
+        "reconfigure": "Reconfigure conversation agent",
+        "user": "Add conversation agent"
+      },
+      "step": {
+        "set_options": {
+          "title": "Configure Conversation Agent",
+          "description": "Customize settings for the Groq conversation agent.",
+          "data": {
+            "name": "Name",
+            "prompt": "System Prompt",
+            "llm_hass_api": "Home Assistant APIs (enable tool calling for device control)",
+            "recommended": "Use recommended settings",
+            "chat_model": "Model",
+            "temperature": "Temperature (0 = focused, 2 = creative)",
+            "top_p": "Top P (nucleus sampling)",
+            "max_tokens": "Max Tokens (maximum response length)"
+          }
+        }
+      },
+      "abort": {
+        "entry_not_loaded": "Cannot add services while the integration is disabled.",
+        "reconfigure_successful": "Reconfigured successfully"
+      }
+    },
+    "stt": {
+      "entry_type": "Speech-to-Text",
+      "initiate_flow": {
+        "reconfigure": "Reconfigure Speech-to-Text service",
+        "user": "Add Speech-to-Text service"
+      },
+      "step": {
+        "set_options": {
+          "title": "Configure Speech-to-Text",
+          "description": "Customize settings for the Groq STT service.",
+          "data": {
+            "name": "Name",
+            "prompt": "System Prompt",
+            "recommended": "Use recommended settings",
+            "chat_model": "Model",
+            "temperature": "Temperature (0 = focused, 2 = creative)",
+            "top_p": "Top P (nucleus sampling)",
+            "max_tokens": "Max Tokens (maximum response length)",
+            "stt_model": "Speech-to-Text Model"
+          }
+        }
+      },
+      "abort": {
+        "entry_not_loaded": "Cannot add services while the integration is disabled.",
+        "reconfigure_successful": "Reconfigured successfully"
+      }
+    },
+    "tts": {
+      "entry_type": "Text-to-Speech",
+      "initiate_flow": {
+        "reconfigure": "Reconfigure Text-to-Speech service",
+        "user": "Add Text-to-Speech service"
+      },
+      "step": {
+        "set_options": {
+          "title": "Configure Text-to-Speech",
+          "description": "Customize settings for the Groq TTS service.",
+          "data": {
+            "name": "Name",
+            "recommended": "Use recommended settings",
+            "chat_model": "Model",
+            "temperature": "Temperature (0 = focused, 2 = creative)",
+            "top_p": "Top P (nucleus sampling)",
+            "max_tokens": "Max Tokens (maximum response length)",
+            "tts_model": "Text-to-Speech Model",
+            "tts_voice": "Text-to-Speech Voice"
+          }
+        }
+      },
+      "abort": {
+        "entry_not_loaded": "Cannot add services while the integration is disabled.",
+        "reconfigure_successful": "Reconfigured successfully"
+      }
+    }
+  },
   "entity": {
     "conversation": {
       "groq": {

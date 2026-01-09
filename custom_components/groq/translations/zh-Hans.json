@@ -24,17 +24,15 @@
   },
   "options": {
     "step": {
-      "init": {
-        "title": "配置 Groq AI",
-        "description": "自定义您的 Groq AI 对话代理设置。",
+      "set_options": {
+        "title": "配置服务",
+        "description": "自定义此 Groq AI 服务的设置。",
         "data": {
-          "enable_conversation": "启用对话代理",
-          "enable_stt": "启用语音转文字",
-          "enable_tts": "启用文字转语音",
+          "name": "名称",
           "prompt": "系统提示",
           "llm_hass_api": "Home Assistant API（启用工具调用以控制设备）",
           "recommended": "使用推荐设置",
-          "chat_model": "聊天模型",
+          "chat_model": "模型",
           "temperature": "温度（0 = 聚焦，2 = 创造性）",
           "top_p": "Top P（核采样）",
           "max_tokens": "最大令牌数（最大响应长度）",
@@ -42,6 +40,92 @@
           "tts_model": "文字转语音模型",
           "tts_voice": "文字转语音声音"
         }
+      }
+    },
+    "error": {
+      "entry_not_loaded": "集成未加载。请稍后再试。"
+    }
+  },
+  "config_subentries": {
+    "conversation": {
+      "entry_type": "对话代理",
+      "initiate_flow": {
+        "reconfigure": "重新配置对话代理",
+        "user": "添加对话代理"
+      },
+      "step": {
+        "set_options": {
+          "title": "配置对话代理",
+          "description": "自定义 Groq 对话代理的设置。",
+          "data": {
+            "name": "名称",
+            "prompt": "系统提示",
+            "llm_hass_api": "Home Assistant API（启用工具调用以控制设备）",
+            "recommended": "使用推荐设置",
+            "chat_model": "模型",
+            "temperature": "温度（0 = 聚焦，2 = 创造性）",
+            "top_p": "Top P（核采样）",
+            "max_tokens": "最大令牌数（最大响应长度）"
+          }
+        }
+      },
+      "abort": {
+        "entry_not_loaded": "集成禁用时无法添加服务。",
+        "reconfigure_successful": "重新配置成功"
+      }
+    },
+    "stt": {
+      "entry_type": "语音转文字",
+      "initiate_flow": {
+        "reconfigure": "重新配置语音转文字服务",
+        "user": "添加语音转文字服务"
+      },
+      "step": {
+        "set_options": {
+          "title": "配置语音转文字",
+          "description": "自定义 Groq 语音转文字服务的设置。",
+          "data": {
+            "name": "名称",
+            "prompt": "系统提示",
+            "recommended": "使用推荐设置",
+            "chat_model": "模型",
+            "temperature": "温度（0 = 聚焦，2 = 创造性）",
+            "top_p": "Top P（核采样）",
+            "max_tokens": "最大令牌数（最大响应长度）",
+            "stt_model": "语音转文字模型"
+          }
+        }
+      },
+      "abort": {
+        "entry_not_loaded": "集成禁用时无法添加服务。",
+        "reconfigure_successful": "重新配置成功"
+      }
+    },
+    "tts": {
+      "entry_type": "文字转语音",
+      "initiate_flow": {
+        "reconfigure": "重新配置文字转语音服务",
+        "user": "添加文字转语音服务"
+      },
+      "step": {
+        "set_options": {
+          "title": "配置文字转语音",
+          "description": "自定义 Groq 文字转语音服务的设置。",
+          "data": {
+            "name": "名称",
+            "recommended": "使用推荐设置",
+            "chat_model": "模型",
+            "temperature": "温度（0 = 聚焦，2 = 创造性）",
+            "top_p": "Top P（核采样）",
+            "max_tokens": "最大令牌数（最大响应长度）",
+            "tts_model": "文字转语音模型",
+            "tts_voice": "文字转语音声音"
+          }
+        }
+      },
+      "abort": {
+        "entry_not_loaded": "集成禁用时无法添加服务。",
+        "reconfigure_successful": "重新配置成功"
       }
     }
   },

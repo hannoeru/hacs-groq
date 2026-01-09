@@ -8,11 +8,11 @@ from typing import Literal
 
 from homeassistant.components import conversation
 from homeassistant.components.conversation import ConversationEntity
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.config_entries import ConfigEntry, ConfigSubentry
 from homeassistant.const import CONF_LLM_HASS_API, MATCH_ALL
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers import llm
+from homeassistant.helpers import device_registry as dr, llm
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from voluptuous_openapi import convert  # type: ignore[import-not-found]
 
@@ -43,7 +43,14 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Groq conversation entities."""
-    async_add_entities([GroqConversationEntity(config_entry)])
+    for subentry in config_entry.subentries.values():
+        if subentry.subentry_type != "conversation":
+            continue
+
+        async_add_entities(
+            [GroqConversationEntity(config_entry, subentry)],
+            config_subentry_id=subentry.subentry_id,
+        )
 
 
 def _convert_messages(
@@ -168,19 +175,19 @@ class GroqConversationEntity(
     _attr_name = None
     _attr_supports_streaming = True
 
-    def __init__(self, entry: ConfigEntry) -> None:
+    def __init__(self, entry: ConfigEntry, subentry: ConfigSubentry) -> None:
         """Initialize the agent."""
         self.entry = entry
-        self._attr_unique_id = f"{entry.entry_id}_conversation"
-        self._attr_device_info = {
-            "identifiers": {(DOMAIN, f"{entry.entry_id}_conversation")},
-            "name": "Conversation",
-            "manufacturer": "Groq",
-            "model": "Chat Completion",
-            "entry_type": "service",
-            "via_device": (DOMAIN, entry.entry_id),
-        }
-        if self.entry.options.get(CONF_LLM_HASS_API):
+        self.subentry = subentry
+        self._attr_unique_id = subentry.subentry_id
+        self._attr_device_info = dr.DeviceInfo(
+            identifiers={(DOMAIN, subentry.subentry_id)},
+            name=subentry.title,
+            manufacturer="Groq",
+            model=subentry.data.get(CONF_CHAT_MODEL, RECOMMENDED_CHAT_MODEL),
+            entry_type=dr.DeviceEntryType.SERVICE,
+        )
+        if self.subentry.data.get(CONF_LLM_HASS_API):
             self._attr_supported_features = (
                 conversation.ConversationEntityFeature.CONTROL
             )
@@ -211,7 +218,7 @@ class GroqConversationEntity(
         chat_log: conversation.ChatLog,
     ) -> conversation.ConversationResult:
         """Process the user input and call the API."""
-        options = self.entry.options
+        options = self.subentry.data
 
         try:
             await chat_log.async_provide_llm_data(
@@ -232,7 +239,7 @@ class GroqConversationEntity(
         chat_log: conversation.ChatLog,
     ) -> None:
         """Generate an answer for the chat log."""
-        options = self.entry.options
+        options = self.subentry.data
 
         messages = _convert_messages(chat_log)
 

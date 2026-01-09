@@ -5,8 +5,9 @@ from __future__ import annotations
 from collections.abc import AsyncIterable
 
 from homeassistant.components import stt
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.config_entries import ConfigEntry, ConfigSubentry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from groq import AsyncGroq
@@ -25,27 +26,34 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Groq STT entities."""
-    async_add_entities([GroqSTTEntity(config_entry)])
+    for subentry in config_entry.subentries.values():
+        if subentry.subentry_type != "stt":
+            continue
+
+        async_add_entities(
+            [GroqSTTEntity(config_entry, subentry)],
+            config_subentry_id=subentry.subentry_id,
+        )
 
 
 class GroqSTTEntity(stt.SpeechToTextEntity):
     """Groq speech-to-text entity."""
 
     _attr_has_entity_name = True
-    _attr_name = "Speech to Text"
+    _attr_name = None
 
-    def __init__(self, config_entry: ConfigEntry) -> None:
+    def __init__(self, entry: ConfigEntry, subentry: ConfigSubentry) -> None:
         """Initialize the STT entity."""
-        self.entry = config_entry
-        self._attr_unique_id = f"{config_entry.entry_id}_stt"
-        self._attr_device_info = {
-            "identifiers": {(DOMAIN, f"{config_entry.entry_id}_stt")},
-            "name": "Speech to Text",
-            "manufacturer": "Groq",
-            "model": "Whisper",
-            "entry_type": "service",
-            "via_device": (DOMAIN, config_entry.entry_id),
-        }
+        self.entry = entry
+        self.subentry = subentry
+        self._attr_unique_id = subentry.subentry_id
+        self._attr_device_info = dr.DeviceInfo(
+            identifiers={(DOMAIN, subentry.subentry_id)},
+            name=subentry.title,
+            manufacturer="Groq",
+            model=subentry.data.get(CONF_STT_MODEL, RECOMMENDED_STT_MODEL),
+            entry_type=dr.DeviceEntryType.SERVICE,
+        )
 
     @property
     def client(self) -> AsyncGroq:
@@ -169,8 +177,8 @@ class GroqSTTEntity(stt.SpeechToTextEntity):
             LOGGER.warning("Received empty audio stream")
             return stt.SpeechResult(None, stt.SpeechResultState.ERROR)
 
-        # Get model from options
-        options = self.entry.options
+        # Get model from subentry data
+        options = self.subentry.data
         model = options.get(CONF_STT_MODEL, RECOMMENDED_STT_MODEL)
 
         # Prepare the file for upload
