@@ -246,7 +246,7 @@ class GroqConversationEntity(
         model = options.get(CONF_CHAT_MODEL, RECOMMENDED_CHAT_MODEL)
         temperature = options.get(CONF_TEMPERATURE, RECOMMENDED_TEMPERATURE)
         top_p = options.get(CONF_TOP_P, RECOMMENDED_TOP_P)
-        max_tokens = options.get(CONF_MAX_TOKENS, RECOMMENDED_MAX_TOKENS)
+        max_tokens = int(options.get(CONF_MAX_TOKENS, RECOMMENDED_MAX_TOKENS))
 
         tools = None
         if chat_log.llm_api:
