@@ -16,9 +16,15 @@ hacs-groq/
 │   ├── helpers.py                  # Helper functions (model caching, etc.)
 │   ├── manifest.json               # Integration metadata
 │   ├── strings.json                # UI strings
+│   ├── icons.json                  # Icon mappings
 │   └── translations/               # Localization files
 │       ├── en.json                 # English translations
-│       └── zh-Hans.json            # Chinese (Simplified) translations
+│       ├── zh-Hans.json            # Chinese (Simplified) translations
+│       ├── zh-Hant.json            # Chinese (Traditional) translations
+│       └── ja.json                 # Japanese translations
+├── .github/workflows/              # GitHub Actions CI/CD
+│   ├── ci.yml                      # Lint, typecheck, and test
+│   └── validate.yml                # HACS validation
 ├── .vscode/                        # VS Code settings
 │   ├── settings.json               # Editor and tool configurations
 │   ├── extensions.json             # Recommended extensions
@@ -36,9 +42,10 @@ hacs-groq/
 1. **Conversation Agent**: Fast LLM-powered conversation with tool calling support
 2. **Speech-to-Text**: Whisper-based audio transcription
 3. **Text-to-Speech**: Orpheus-powered natural voice synthesis
-4. **Multi-language Support**: English and Chinese UI translations
-5. **HACS Compatible**: Ready for distribution via HACS
+4. **Multi-language Support**: English, Chinese (Simplified/Traditional), and Japanese UI translations
+5. **HACS Compatible**: Ready for distribution via HACS with GitHub Actions validation
 6. **Dynamic Model Fetching**: Automatically discovers and lists available Groq models
+7. **ConfigSubentry Pattern**: Users can add multiple instances of each service type
 
 ## Technical Details
 
@@ -61,19 +68,22 @@ Hardcoded fallback lists are used if API fetching fails.
 - LLM Tool Calling API
 
 ## Configuration
-The integration supports two configuration modes:
-1. **Recommended Mode**: Uses optimal default settings
-2. **Advanced Mode**: Full control over all model parameters
+The integration uses the ConfigSubentry pattern (similar to Google Generative AI):
+- Users add the integration once with their API key
+- Then add individual service instances (Conversation, STT, TTS) as needed
+- Each service can be added multiple times with different configurations
+- No "recommended mode" - all parameters are always visible
 
 ## Development Notes
 - Based on Home Assistant's Google Generative AI Conversation integration pattern
-- Follows HACS integration requirements
+- Follows HACS integration requirements with GitHub Actions validation
 - Uses async/await throughout
 - Implements proper error handling and logging
 - Dynamic model fetching with intelligent caching (60-minute TTL)
 - Model categorization based on ID patterns (whisper=STT, orpheus=TTS, others=chat)
 - Uses `uv` for fast dependency management
 - Development tools: ruff (linting/formatting), mypy (type checking), pytest (testing)
+- CI/CD: GitHub Actions for automated testing and HACS validation
 
 ## Development Setup
 ```bash

@@ -2,6 +2,7 @@
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![GitHub Release](https://img.shields.io/github/release/hannoeru/hacs-groq.svg)](https://github.com/hannoeru/hacs-groq/releases)
+[![CI](https://github.com/hannoeru/hacs-groq/actions/workflows/ci.yml/badge.svg)](https://github.com/hannoeru/hacs-groq/actions/workflows/ci.yml)
 [![Validate](https://github.com/hannoeru/hacs-groq/actions/workflows/validate.yml/badge.svg)](https://github.com/hannoeru/hacs-groq/actions/workflows/validate.yml)
 
 A Home Assistant custom integration that brings Groq's ultra-fast LLM inference, speech-to-text, and text-to-speech capabilities to your smart home.
