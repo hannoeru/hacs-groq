@@ -166,7 +166,8 @@ class GroqConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
     @classmethod
     @callback
     def async_get_supported_subentry_types(
-        cls, config_entry: ConfigEntry  # noqa: ARG003
+        cls,
+        config_entry: ConfigEntry,  # noqa: ARG003
     ) -> dict[str, type[ConfigSubentryFlow]]:
         """Return subentries supported by this integration."""
         return {
@@ -361,11 +362,13 @@ async def groq_config_option_schema(  # noqa: PLR0912
         tts_model = options.get(CONF_TTS_MODEL, RECOMMENDED_TTS_MODEL)
         if "arabic" in tts_model.lower():
             voice_options = [
-                SelectOptionDict(label=voice, value=voice) for voice in TTS_VOICES_ARABIC
+                SelectOptionDict(label=voice, value=voice)
+                for voice in TTS_VOICES_ARABIC
             ]
         else:
             voice_options = [
-                SelectOptionDict(label=voice, value=voice) for voice in TTS_VOICES_ENGLISH
+                SelectOptionDict(label=voice, value=voice)
+                for voice in TTS_VOICES_ENGLISH
             ]
 
         schema.update(

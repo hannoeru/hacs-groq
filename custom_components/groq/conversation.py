@@ -14,7 +14,6 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr, llm
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from voluptuous_openapi import convert  # type: ignore[import-not-found]
 
 from groq import AsyncGroq
 from groq.types.chat import ChatCompletionChunk
@@ -32,6 +31,7 @@ from .const import (
     RECOMMENDED_TEMPERATURE,
     RECOMMENDED_TOP_P,
 )
+from .voluptuous_to_jsonschema import convert
 
 # Max number of back and forth with the LLM to generate a response
 MAX_TOOL_ITERATIONS = 10
@@ -95,6 +95,10 @@ def _convert_messages(
 
 def _format_tool(tool: llm.Tool, custom_serializer) -> dict:
     """Format tool specification for Groq API."""
+
+    # `tool.parameters` is a Voluptuous schema in HA. Convert it into JSON schema.
+    # We avoid depending on external `voluptuous_openapi` because it's not
+    # guaranteed to be present in the HA runtime.
     return {
         "type": "function",
         "function": {
@@ -140,9 +144,9 @@ async def _transform_stream(  # noqa: PLR0912
                     if tool_call_delta.function.name:
                         current_tool_calls[idx]["name"] = tool_call_delta.function.name
                     if tool_call_delta.function.arguments:
-                        current_tool_calls[idx][
-                            "arguments"
-                        ] += tool_call_delta.function.arguments
+                        current_tool_calls[idx]["arguments"] += (
+                            tool_call_delta.function.arguments
+                        )
 
         # Check if we have complete tool calls
         finish_reason = chunk.choices[0].finish_reason
